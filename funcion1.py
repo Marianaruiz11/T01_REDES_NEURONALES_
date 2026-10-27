@@ -6,10 +6,10 @@ diferencial (DE). Además dos líneas base opcionales: búsqueda aleatoria y
 recocido simulado.
 
 Comandos (todos con un solo comando, sin editar código):
-    python optimizacion.py check
-    python optimizacion.py run   --algo pso --dim 2 --seed 42
-    python optimizacion.py stats --runs 30 --dims 2 3
-    python optimizacion.py gif   --algo gradient_descent --out figs/gd.gif
+    python funcion1.py check
+    python funcion1.py run   --algo pso --dim 2 --seed 42
+    python funcion1.py stats --runs 30 --dims 2 3
+    python funcion1.py gif   --algo gradient_descent --out figs/gd.gif
 
 Los hiperparámetros se cambian con --param (p. ej. --param lr0=0.5
 --param pso.w=0.6) o con un archivo --config config.json.
@@ -162,11 +162,23 @@ def accepted_params(algo: str) -> set[str]:
 # ---------------- Descenso por gradiente ----------------
 @register_algorithm("gradient_descent")
 def gradient_descent(obj, dim, bounds, rng, max_evals, record=False,
-                     tol=1e-8, h=1e-6, lr0=1.0, c=1e-4, shrink=0.5, max_ls=60):
+                     tol=1e-8, h=1e-6, lr0=1.0, c=1e-4, shrink=0.5, max_ls=60, x0=None):
     """x_{k+1} = P(x_k - a_k g_k), g_k por diferencias centrales, a_k por
     Armijo con retroceso (a <- shrink*a) y P = proyección al dominio."""
     lo, hi = bounds
-    x = rng.uniform(lo, hi, dim)       # único elemento aleatorio: el punto inicial
+    if not (np.isfinite([tol,h,lr0,c,shrink]).all() and tol >= 0 and h > 0
+            and lr0 > 0 and 0 < c < 1 and 0 < shrink < 1
+            and isinstance(max_ls, int) and max_ls >= 1):
+        raise ValueError('Revise tol, h, lr0, c, shrink y max_ls')
+    if x0 is None:
+        x = rng.uniform(lo, hi, dim)
+    else:
+        x = np.asarray(x0, dtype=float)
+        if x.shape != (dim,) or not np.isfinite(x).all():
+            raise ValueError(f'x0 debe contener {dim} coordenadas finitas')
+        if ((x < lo) | (x > hi)).any():
+            raise ValueError(f'x0 debe estar dentro de [{lo}, {hi}]; no se recorta')
+        x = x.copy()
     fx = obj(x)
     hist, ev = [fx], [obj.n_equiv]
     frames = [x.copy()] if record else None
@@ -367,6 +379,8 @@ MAIN_ALGOS = ("gradient_descent", "genetic", "pso", "differential_evolution")
 def optimize(algorithm="gradient_descent", problem="rosenbrock", dim=2,
              random_seed=42, max_evals=20000, record=False,
              **algo_params) -> OptimizeResult:
+    if not isinstance(max_evals, int) or max_evals < 1:
+        raise ValueError('max_evals debe ser un entero positivo')
     if algorithm not in ALGORITHMS:
         raise ValueError(f"Algoritmo '{algorithm}' no registrado. Opciones: {sorted(ALGORITHMS)}")
     if problem not in PROBLEMS:
@@ -422,6 +436,8 @@ def make_gif(algorithm, out, dim=2, seed=42, max_evals=20000, params=None,
              max_frames=80, fps=10, problem="rosenbrock"):
     if dim != 2:
         raise ValueError("El GIF solo está implementado para dim=2.")
+    if fps < 1 or max_frames < 1:
+        raise ValueError('fps y max_frames deben ser positivos')
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -435,7 +451,12 @@ def make_gif(algorithm, out, dim=2, seed=42, max_evals=20000, params=None,
     X, Y = np.meshgrid(g, g)
     Z = 100.0 * (Y - X ** 2) ** 2 + (1.0 - X) ** 2
 
-    fig, ax = plt.subplots(figsize=(5.5, 5))
+    fig, ax = plt.subplots(figsize=(5.5, 5.4))
+    fig.subplots_adjust(bottom=0.18)
+    fig.text(0.5, 0.02, 'Fuente: elaboración propia; funcion1.py, Rosenbrock.\n'
+             f'Semilla: {seed}; presupuesto: {max_evals}; algoritmo: {algorithm}\n'
+             f'Condición inicial GD: {(params or {}).get("x0", "aleatoria por semilla")}',
+             ha='center', fontsize=7)
     ax.contourf(X, Y, Z, levels=np.logspace(-2, 3.5, 25), extend="both", cmap="viridis")
     ax.plot(1, 1, "r*", ms=14, label="óptimo (1,1)")
     is_path = np.ndim(res.frames[0]) == 1
@@ -464,6 +485,10 @@ def make_gif(algorithm, out, dim=2, seed=42, max_evals=20000, params=None,
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     FuncAnimation(fig, update, frames=len(sel)).save(out, writer=PillowWriter(fps=fps))
     plt.close(fig)
+    metadata = dict(problem=problem, algorithm=algorithm, seed=seed, dim=dim,
+                    max_evals=max_evals, params=params or {}, f_best=res.f_best,
+                    n_equiv=res.n_equiv, source='Elaboración propia; funcion1.py')
+    Path(str(out)+'.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     return res
 
 
@@ -537,6 +562,8 @@ def build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--config", help="archivo JSON con valores por defecto")
     common.add_argument("--max-evals", dest="max_evals", type=int)
+    common.add_argument('--x0', nargs='+', type=float,
+                        help='coordenadas iniciales de GD; ejemplo --x0 -1.2 1')
     common.add_argument("--param", action="append", metavar="[algo.]clave=valor")
 
     p = argparse.ArgumentParser(description=__doc__,
@@ -584,6 +611,13 @@ def main(argv=None):
         base = {a: dict(cfg.get("params", {}).get(a, {})) for a in ALGORITHMS}
         for a, d in parse_overrides(args.param, selected).items():
             base[a].update(d)
+        punto = getattr(args, 'x0', None)
+        if punto is None:
+            punto = base['gradient_descent'].get('x0', cfg.get('x0'))
+        if punto is not None:
+            if 'gradient_descent' not in selected:
+                raise SystemExit('--x0 solo se aplica a gradient_descent')
+            base['gradient_descent']['x0'] = punto
         return base
 
     if args.cmd == "run":
@@ -629,14 +663,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
-
-
-    from optimizacion import optimize
-
-res = optimize(algorithm="gradient_descent", problem="rosenbrock",
-               dim=2, random_seed=42, max_evals=20000, lr0=0.5)
-
-print(res)           # resumen
-print(res.x_best)    # mejor punto
-print(res.f_best)    # mejor valor
-print(res.n_f, res.n_grad, res.n_equiv)
