@@ -1,0 +1,59 @@
+% Fragmento para el reporte. Requiere \usepackage{amsmath,amssymb}.
+\subsection{Función de prueba y descenso por gradiente}
+Para $d\in\{2,3\}$, la función de Rosenbrock es
+\[
+f(\mathbf{x})=\sum_{i=1}^{d-1}\left[100(x_{i+1}-x_i^2)^2+(1-x_i)^2\right],
+\qquad \mathbf{x}\in[-2.048,2.048]^d.
+\]
+Su mínimo global es $f(\mathbf{1})=0$. La forma del valle permite
+estudiar el comportamiento del método en una geometría con curvaturas
+desiguales; conocer el mínimo facilita medir el error sin usarlo para guiar
+la búsqueda.
+
+La condición inicial $\mathbf{x}^{(0)}$ se proporciona explícitamente
+por consola o configuración. Si se omite, se muestrea uniformemente
+en el dominio con la semilla indicada.
+
+El código aproxima cada componente del gradiente por diferencias centrales:
+\[
+g_{k,j}=\frac{f(\mathbf{x}_k+h\mathbf{e}_j)-f(\mathbf{x}_k-h\mathbf{e}_j)}{2h},
+\qquad h>0.
+\]
+La actualización es un paso proyectado:
+\[
+\mathbf{z}_k(\alpha)=\Pi_{\mathcal{D}}(\mathbf{x}_k-\alpha\mathbf{g}_k),
+\qquad \mathcal{D}=[-2.048,2.048]^d.
+\]
+La búsqueda por retroceso comienza con $\alpha_0>0$ y reduce
+$\alpha\leftarrow\rho\alpha$, con $0<\rho<1$, hasta satisfacer
+la condición de Armijo proyectada implementada:
+\[
+f(\mathbf{z}_k(\alpha))\leq f(\mathbf{x}_k)
+-c\,\mathbf{g}_k^{\mathsf T}(\mathbf{x}_k-\mathbf{z}_k(\alpha)),
+\qquad 0<c<1.
+\]
+El punto aceptado define $\mathbf{x}_{k+1}$. El método se detiene
+por tolerancia del gradiente, agotamiento del presupuesto,
+falta de aceptación en el número máximo de retrocesos o ausencia
+de desplazamiento. No se garantiza convergencia por fijar un presupuesto.
+
+\subsection{Presupuesto de evaluación y reproducibilidad}
+Un gradiente por diferencias centrales en $d$ dimensiones requiere
+$2d$ evaluaciones de la función. Para evitar doble conteo:
+\[
+N_{\mathrm{equiv}}=N_f+2dN_{\nabla},
+\]
+donde $N_f$ cuenta las llamadas directas, incluyendo inicialización
+y búsqueda lineal, y $N_{\nabla}$ cuenta las aproximaciones del gradiente.
+
+En $S$ corridas se resumen media, desviación estándar, mejor, peor
+y frecuencia de éxito según el umbral $\varepsilon$ predefinido:
+\[
+\overline{f}=\frac{1}{S}\sum_{s=1}^{S}f_s,\qquad
+s_f=\sqrt{\frac{1}{S-1}\sum_{s=1}^{S}(f_s-\overline{f})^2},\qquad
+\widehat{p}_{\mathrm{exito}}=\frac{1}{S}\sum_{s=1}^{S}\mathbb{I}(f_s<\varepsilon).
+\]
+Con GD y una condición inicial fija, variar la semilla no genera
+trayectorias distintas en esta implementación. Para estudiar variabilidad
+entre inicializaciones se conserva el muestreo del punto inicial o se
+declara previamente un conjunto de condiciones distintas.

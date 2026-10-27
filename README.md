@@ -1,3 +1,17 @@
+# Trabajo 1 — Parte 1 y demo TSP
+
+## Corrección de la parte 1
+
+La parte 1 permite ahora elegir la condición inicial del descenso por gradiente. Consulte [instrucciones y verificaciones](docs/CORRECCIONES_PARTE1.md), [ecuaciones para el reporte](docs/PARTE1_ECUACIONES.tex) y [registro de verificaciones](docs/VERIFICACIONES_IA_PARTE1.md).
+
+```bash
+python funcion1.py run --algo gradient_descent --dim 2 --x0 -1.2 1 --max-evals 20000
+```
+
+La documentación de la demo del punto 2 se conserva a continuación; sus datos y código no se modificaron como parte de esta corrección.
+
+---
+
 
 # TSP España — paquete DEMO ejecutable
 
