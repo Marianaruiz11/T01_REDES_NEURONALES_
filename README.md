@@ -1,5 +1,9 @@
 # Trabajo 1 — Parte 1 y demo TSP
 
+## Notebook del punto 1
+
+Abra [punto_1/Experimentos.ipynb](punto_1/Experimentos.ipynb). Se incorporó la versión del notebook del equipo y se corrigió su módulo acompañante, conservando Rosenbrock, Rastrigin y las animaciones Plotly. Instale sus dependencias con `python -m pip install -r punto_1/requirements.txt` y seleccione ese entorno como kernel. Cambie `X0_2D` y `X0_3D` en la primera celda para la demostración. La corrección no incorpora archivos del punto 2 del repositorio original.
+
 ## Corrección de la parte 1
 
 La parte 1 permite ahora elegir la condición inicial del descenso por gradiente. Consulte [instrucciones y verificaciones](docs/CORRECCIONES_PARTE1.md), [ecuaciones para el reporte](docs/PARTE1_ECUACIONES.tex) y [registro de verificaciones](docs/VERIFICACIONES_IA_PARTE1.md).
